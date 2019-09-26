@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hx.rm.dao.UserDao">
+	<cache></cache>
+	<resultMap type="User" id="userMapper" autoMapping="true">
+		<result column="username" property="userName"/>
+		<!--一对一的两种映射方式，都私用javaType这个属性  -->
+		<!-- <collection property="userInfo" javaType="UserInfo" autoMapping="true">
+		</collection> -->
+		<association property="userInfo" javaType="UserInfo" autoMapping="true"/>
+		<collection property="pers" ofType="Permission" autoMapping="true">
+			<id column="pid" property="id"/>
+			<result column="name" property="name"/>
+			<collection property="subs" ofType="Permission">
+				<id column="cid" property="id"/>
+				<result column="cname" property="name"/>
+				<result column="curl" property="url"/>
+				<result column="cicon" property="icon"/>
+				<result column="ctype" property="type"/>
+				<result column="csort" property="sort"/>
+				<result column="cparentid" property="parentId"/>
+			</collection>
+		</collection>
+	</resultMap>
+	<resultMap type="User" id="getRoles" autoMapping="true">
+		<result column="username" property="userName"/>
+		<collection property="roles" ofType="Role" autoMapping="true">
+			<id column="roleid" property="id"/>
+		</collection>
+	</resultMap>
+	<!--查询1======根据id查询  User-->
+	<select id="load" parameterType="int" resultMap="getRoles" useCache="true">
+		SELECT *,r.id as roleid from t_user u
+		LEFT JOIN t_user_role ur on u.id=ur.uid
+		LEFT JOIN t_role r ON r.id=ur.rid
+		WHERE u.id=#{id}
+	</select>
+	
+	<select id="list" resultType="User" useCache="true">
+		select * from t_user
+	</select>
+	<!--查询2=====根据ID查询权限permission  -->
+	<select id="getPermissionById" parameterType="int" resultMap="userMapper" useCache="false">
+		SELECT u.*,p2.*,p2.id as pid,p1.name as cname,p1.url as curl,p1.icon as cicon,p1.type as ctype,p1.sort as csort,p1.id as cid,p1.parent_id as cparentid
+		FROM t_user u
+		LEFT JOIN t_user_role ur on ur.uid=u.id
+		LEFT JOIN t_role_permission rp on rp.rid=ur.rid
+		LEFT JOIN t_permission p1 on p1.id=rp.pid
+		LEFT JOIN t_permission p2 on p2.id=p1.parent_id
+		where p2.parent_id=0 and u.id=#{id}
+		ORDER BY p1.sort DESC
+	</select>
+	<!--查询3=====根据用户名密码查询用户登录  -->
+	<select id="login" parameterType="User" resultType="User">
+		<if test="userName!=null and userName!='' and password!=null">
+			select * from t_user 
+			<where>
+			  username=#{userName} and password=#{password}
+			</where>
+		</if>
+	</select>
+	
+	<!--查询4=====分页查询  -->
+	<select id="find" parameterType="map" resultMap="userMapper" useCache="true">
+		select * from t_user tu
+		left join t_userinfo tui on tu.id=tui.uid
+		<if test="condition != null and condition !=''">
+				 where tu.username like concat(#{condition},"%")
+		</if>
+		limit #{offSet},#{pageNum}
+	</select>
+	<!--查询5=====总条数  -->
+	<select id="count" resultType="int">
+		SELECT count(*) from t_user tu
+		<if test="condition != null and condition !=''">
+				 where tu.username like concat(#{condition},"%")
+		</if>
+	</select>
+	<!--增加1===  -->
+	<insert id="add" parameterType="User" useGeneratedKeys="true" keyProperty="id">
+		insert into t_user(id,username,password,email,phone)
+		<if test="userName!=null and userName!=''">
+			value(null,#{userName},#{password},#{email},#{phone})
+		</if>
+	</insert>
+	<!--增加2=====分配角色  -->
+	<insert id="assignRole" parameterType="map">
+		insert into t_user_role(uid,rid) value
+		<foreach collection="ids" separator="," item="item">
+			(#{uid},#{item})
+		</foreach>
+	</insert>
+	<!-- 删除1关联多表删除 -->
+	<delete id="delete" parameterType="int">
+		delete tu,tur from
+		t_user tu
+		left join t_user_role tur on tu.id=tur.uid
+		where tu.id=#{id}
+	</delete>
+	<!-- 修改1=======修改  -->
+	<update id="update" parameterType="User">
+		<!-- 第一步=========删除用户角色表  -->
+		delete from
+		<if test="id!=null and id!=''"> 
+		t_user_role
+			<where>
+				uid=#{id};
+			</where>
+		</if>
+		<!-- 第二步==========更新用户表  -->
+		update t_user
+		<if test="id!=null and id!=''">
+			<trim prefix="set" prefixOverrides=",">
+				<if test="userName!=null and userName!=''">
+					,username=#{userName}
+				</if>
+				<if test="password!=null and password!=''">
+					,password=#{password}
+				</if>
+				<if test="email!=null and email!=''">
+					,email=#{email}
+				</if>
+				<if test="phone!=null and phone!=''">
+					,phone=#{phone}
+				</if>
+			</trim>
+			<where>
+					id=#{id};
+			</where>
+		</if>
+		<!-- 第三步=======插入用户角色中间表 -->
+		<!-- 第四步=======更改用户信息表 -->
+	</update>
+</mapper> 

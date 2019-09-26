@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 使用spring整合的mybatis的时候，这里指向接口而不是类   --> 
+<mapper namespace="com.hx.rm.dao.RoleDao">
+	<cache></cache>
+	<resultMap type="Role" id="showMapper" autoMapping="true">
+		<id column="id" property="id"/>
+		<!--Permission用了在Role实体类中是一对一的方式，所以在这里用javaType  -->
+		<collection property="pers" ofType="Permission" autoMapping="true">
+			<id column="tpid" property="id"/>
+			<result column="parent_id" property="parentId"/>
+			<result column="tpname" property="name"/>
+		</collection>
+	</resultMap>
+	
+	<!--查询1====根据ID查询  -->
+	<select id="load" parameterType="int" resultType="Role" useCache="true">
+		select * from t_role
+		<if test="id!=null and id!=''">
+			where id=#{id}
+		</if>
+	</select>
+	<select id="list" resultType="Role">
+		select * from t_role
+	</select>
+	
+	<select id="getShowMassage" parameterType="int" resultMap="showMapper" useCache="true">
+		select tr.*,tp.*,tp.name as tpname,tp.id as tpid from t_role tr
+		left join t_role_permission trp on trp.rid=tr.id
+		left join t_permission tp on tp.id=trp.pid
+		<if test="id!=null and id!=''">
+			where tr.id=#{id}
+		</if>
+	</select>
+	<!--查询2=====用于修改用户信息排除当前拥有权限显示  -->
+	<select id="notList" resultType="Role" useCache="true">
+		select * from t_role
+			<where>
+			 	id not in
+				<foreach collection="list" item="item" index="i" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</where>
+	</select>
+	<!--查询3=====分页查询  -->
+	 <select id="find" parameterType="map" resultMap="showMapper" useCache="true">
+		select tr.*,group_concat(tp.name) as tpname from t_role tr
+		left join t_role_permission trp on tr.id=trp.rid
+		left join t_permission tp on tp.id=trp.pid
+		group by tr.id
+		<if test="condition != null and condition !=''">
+				 having tr.description like concat(#{condition},"%")
+		</if>
+		limit #{offSet},#{pageNum}
+	</select>
+	<!--查询4=====总条数  -->
+	<select id="count" resultType="int">
+		select count(*) from t_role
+		<if test="condition != null and condition !=''">
+				 where description like concat(#{condition},"%")
+		</if>
+	</select>
+	
+	<!--增加1======  -->
+	<insert id="add" parameterType="Role" useGeneratedKeys="true" keyProperty="id">
+		insert into t_role(id,name,description) value(null,
+		<if test="name!=null and name !=''">
+			#{name},
+		</if>
+		<if test="description!=null and description !=''">
+			#{description})
+		</if>
+	</insert>
+	<!--增加2=====分配权限 -->
+	<insert id="assignPermission" parameterType="map">
+		insert into t_role_permission(rid,pid) value
+		<foreach collection="ids" separator="," item="item">
+			(#{rid},#{item})
+		</foreach>
+	</insert>
+	
+	<!--删除1=====  -->
+	<delete id="delete">
+		delete tr,trp from
+		<if test="id!=null and id !=''">
+			t_role tr
+			left join t_role_permission trp on tr.id=trp.rid
+			<where>
+				tr.id=#{id}
+			</where>
+		</if>
+	</delete>
+	
+	<!--更改1======  -->
+	<update id="update">
+		update t_role
+		<set>
+			<if test="name!=null and name!=''">
+				name=#{name},
+			</if>
+			<if test="description !=null and description != ''">
+				description=#{description}
+			</if>
+		</set>
+		<where>
+			<if test="id!=null and id!=''">
+				id=#{id}
+			</if>
+		</where>
+	</update>
+	<!--可以将int数组放进map里面，在foreach的时候直接用int[]的建值就可以了  -->
+	<insert id="updatePermission" parameterType="map">
+		delete from t_role_permission where rid=#{rid};
+		insert into t_role_permission(rid,pid) value
+		<foreach collection="ids" item="item" separator=",">
+			(#{rid},#{item})
+		</foreach>
+	</insert>
+</mapper>

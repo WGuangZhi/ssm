@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.3.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd">
+	
+	<context:component-scan base-package="com.hx.rm"/>
+		<!-- <context:exclude-filter type="annotation"
+			expression="org.springframework.stereotype.Controller" /> -->
+	<context:annotation-config/>
+	
+	<!--1.读取配置文件获取连接mysql的信息  property-placeholder属性所在地-->
+	<context:property-placeholder location="classpath:jdbc.properties"/>
+	<!--2.将第一步获取到的连接信息配置到驱动管理里面，也就是交给spring管理。  -->
+	<bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+		<property name="driverClassName" value="${jdbc.driver}"/>
+		<property name="url" value="${jdbc.url}"/>
+		<property name="username" value="${jdbc.username}"/>
+		<property name="password" value="${jdbc.password}"/>
+	</bean>
+	<!--3.在mybatis-spring适配器中  创建SqlSessionFactoryBean对象   并连接数据库   -->
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<!-- <property name="configLocation" value="classpath:mybatis-config.xml"></property> -->
+		<property name="typeAliasesPackage" value="com.hx.rm.entity"/>
+		<property name="plugins">
+			<array>
+				<bean class="com.github.pagehelper.PageInterceptor">
+					<property name="properties">
+						<value>helperDialect=mysql</value>
+					</property>
+				</bean>			
+			</array>
+		</property>
+		<property name="dataSource" ref="dataSource"/>
+		<property name="mapperLocations" value="classpath:mappings/*.xml"/>
+		<!-- 实体映射文件xml 对应的命名空间得指向接口类 -->
+	</bean>
+	
+	<!--4.mybatis-spring适配器中  配置dao接口的包   -->
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<property name="basePackage" value="com.hx.rm.dao"/>
+		<property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"/>
+	</bean>
+	
+	<!--5.配置事务管理  -->
+	<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<!--关联数据源  -->
+		<property name="dataSource" ref="dataSource"/>
+	</bean>
+</beans>
